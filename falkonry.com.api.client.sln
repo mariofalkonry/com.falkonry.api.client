@@ -9,9 +9,15 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EchoApi", "EchoApi\EchoApi.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FalkonryCSVLoader", "FalkonryCSVLoader\FalkonryCSVLoader.csproj", "{E1E0A6EF-BE9C-497A-A3F1-8E9E45614553}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "falkonry.com.api.test", "falkonry.com.api.test\falkonry.com.api.test.csproj", "{AA808133-35AA-4C40-8E00-20FC04439CC1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "falkonry.com.api.test", "falkonry.com.api.test\falkonry.com.api.test.csproj", "{AA808133-35AA-4C40-8E00-20FC04439CC1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "falkonry.com.api", "falkonry.com.api\falkonry.com.api.csproj", "{988D1CE1-215C-4A32-987F-508B8567B6F6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "falkonry.com.api", "falkonry.com.api\falkonry.com.api.csproj", "{988D1CE1-215C-4A32-987F-508B8567B6F6}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FileCopy", "FileCopy\FileCopy.csproj", "{B8FFDED8-E78C-4399-8C02-CA707AAB20DF}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataSanitizer", "DataSanitizer\DataSanitizer.csproj", "{B7E7204D-16F4-46CD-B3F5-08B6F06A0691}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FalkonryCancelJobs", "FalkonryCancelJobs\FalkonryCancelJobs.csproj", "{AE5C03D5-28BF-4FD7-8F2E-965D5A75813D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,6 +45,18 @@ Global
 		{988D1CE1-215C-4A32-987F-508B8567B6F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{988D1CE1-215C-4A32-987F-508B8567B6F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{988D1CE1-215C-4A32-987F-508B8567B6F6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B8FFDED8-E78C-4399-8C02-CA707AAB20DF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B8FFDED8-E78C-4399-8C02-CA707AAB20DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B8FFDED8-E78C-4399-8C02-CA707AAB20DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B8FFDED8-E78C-4399-8C02-CA707AAB20DF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7E7204D-16F4-46CD-B3F5-08B6F06A0691}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7E7204D-16F4-46CD-B3F5-08B6F06A0691}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7E7204D-16F4-46CD-B3F5-08B6F06A0691}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7E7204D-16F4-46CD-B3F5-08B6F06A0691}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AE5C03D5-28BF-4FD7-8F2E-965D5A75813D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AE5C03D5-28BF-4FD7-8F2E-965D5A75813D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AE5C03D5-28BF-4FD7-8F2E-965D5A75813D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AE5C03D5-28BF-4FD7-8F2E-965D5A75813D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

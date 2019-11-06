@@ -1,4 +1,12 @@
-﻿using System;
+﻿/*
+The MIT License
+Copyright © 2010-2019 Falkonry.com
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+using System;
 using System.Collections.Generic;
 using Flurl;
 using Flurl.Http;
@@ -10,29 +18,48 @@ using System.Net.Http.Headers;
 using Newtonsoft.Json.Converters;
 using System.IO;
 using System.Dynamic;
+using System.Threading;
+using System.Linq;
 // TODO: Logging
 
 namespace falkonry.com.api
 {
     public enum JOBTYPE
     {
-        NONE,INGESTDATA // More to be added in the future
+        NONE,INGESTDATA,LIVE, 
+         LEARN, APPLY, INGESTEVENTS, DIGEST, DATAPERSIST, IMAGE, INVITE, EXPORT, TESTEMAIL, EXPLANATIONREPORT, REORG
+        // More to be added in the future
     }
 
     public enum JOBSTATUS
     {
-        NONE,CREATED,COMPLETED
+        NONE,CREATED,COMPLETED,CANCELLED,RUNNING,FAILED
+    }
+
+    public enum MODELTYPE
+    {
+        BATCH,SLIDING_WINDOW
     }
 
     public interface IApiHelper
     {
         dynamic LoadCSVFile<T>(string filepath,Job<T> job) where T:StreamFormat;
 
-        IList<dynamic> LoadCSVFiles<T>(IList<string> filepaths, Job<T> job,int blocksize=20) where T : StreamFormat;
+        IList<dynamic> LoadCSVFiles<T>(IList<string> filepaths, Job<T> job,int blocksize=20,int sleepSecs=20) where T : StreamFormat;
 
         IList<dynamic> GetDataStreams();
-        IList<dynamic> GetJobs();
+        IList<dynamic> GetJobs(string stream = null, IList<JOBTYPE> types = null, IList<JOBSTATUS> statuses = null);
+        dynamic CancelJob(string jobId);
+        IList<dynamic> CancelStreamJobs(string stream,List<JOBTYPE> typeFilters,List<JOBSTATUS> statusFilters);
+
         IList<dynamic> GetUsers();
+
+        dynamic SetDataStream(string Name, string timezone, MODELTYPE modelType,string baseTimeUnit="micros");
+
+        // TODO: Is this Good?  I can get props for other accounts.  Maybe make like Jobs API?
+        IList<dynamic> SetAccountProps(string account,Dictionary<string, string> props); 
+        IList<dynamic> GetAccountProps(string account);
+
     }
 
     //WIDE - {"jobType": "INGESTDATA", "status": "CREATED", "datastream": "1554938538981549", "spec": { "format": {"entityIdentifier": "person", "timeIdentifier": "time", "timeFormat": "YYYY-MMDD HH:mm:ss.SSS", "timeZone": "America/Los_Angeles" } } }
@@ -42,7 +69,131 @@ namespace falkonry.com.api
         public string entityIdentifier { get; set; }
         public string timeIdentifier { get; set; }
         public string timeFormat { get; set; }
+
+        // Java TimeZone names (see https://docs.oracle.com/javase/8/docs/api/java/time/ZoneId.html)
         public string timeZone { get; set; }
+        public string entityKey { get; set; }  // When no entity identifier is provided
+
+
+        public static StreamFormat CreateFromFile(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                throw (new ArgumentNullException(nameof(path)));
+
+            string configPath = path.Contains(Path.DirectorySeparatorChar) ? path : $"{AppDomain.CurrentDomain.BaseDirectory}{path}";
+            var jsonString = File.ReadAllText(configPath);
+            try
+            {
+                var streamObj = JsonConvert.DeserializeObject<NarrowBatchFormat>(jsonString);
+
+                // Test that must have entityKey or entityIdentifier
+                if (String.IsNullOrEmpty(streamObj.entityIdentifier) && String.IsNullOrEmpty(streamObj.entityKey))
+                    throw (new ArgumentException("Must specify an entityIdentifier column or an entityKey"));
+
+                dynamic newObj=null;
+                // Not narrow
+                if (String.IsNullOrEmpty(streamObj.signalIdentifier))
+                {
+                    // Not batch
+                    if (String.IsNullOrEmpty(streamObj.batchIdentifier))
+                    {
+                        // No entityKey
+                        if (String.IsNullOrEmpty(streamObj.entityKey))
+                        {
+                            newObj = new StreamFormat
+                            {
+                                entityIdentifier = streamObj.entityIdentifier,
+                                timeIdentifier = streamObj.timeIdentifier,
+                                timeFormat = streamObj.timeFormat,
+                                timeZone = streamObj.timeZone
+
+                            };
+                        }
+                        else
+                        {
+                            newObj = new StreamFormat
+                            {
+                                entityKey = streamObj.entityKey,
+                                timeIdentifier = streamObj.timeIdentifier,
+                                timeFormat = streamObj.timeFormat,
+                                timeZone = streamObj.timeZone
+                            };
+                        }
+                    }
+                    else
+                    {
+                        // No entityKey
+                        if (String.IsNullOrEmpty(streamObj.entityKey))
+                        {
+                            newObj = new BatchFormat
+                            {
+                                batchIdentifier = streamObj.batchIdentifier,
+                                entityIdentifier = streamObj.entityIdentifier,
+                                timeIdentifier = streamObj.timeIdentifier,
+                                timeFormat = streamObj.timeFormat,
+                                timeZone = streamObj.timeZone
+
+                            };
+                        }
+                        else
+                        {
+                            newObj = new BatchFormat
+                            {
+                                batchIdentifier = streamObj.batchIdentifier,
+                                entityKey = streamObj.entityKey,
+                                timeIdentifier = streamObj.timeIdentifier,
+                                timeFormat = streamObj.timeFormat,
+                                timeZone = streamObj.timeZone
+                            };
+                        }
+                    }
+                }
+                else
+                {
+                    // Not batch
+                    if (String.IsNullOrEmpty(streamObj.batchIdentifier))
+                    {
+                        if(String.IsNullOrEmpty(streamObj.entityKey))
+                        {
+                            newObj = new NarrowFormat
+                            {
+                                entityIdentifier = streamObj.entityIdentifier,
+                                timeIdentifier=streamObj.timeIdentifier,
+                                timeFormat=streamObj.timeFormat,
+                                timeZone=streamObj.timeZone,
+                                signalIdentifier = streamObj.signalIdentifier,
+                                valueIdentifier=streamObj.valueIdentifier
+                            };
+                        }
+                        else
+                        {
+                            newObj = new NarrowFormat
+                            {
+                                entityKey = streamObj.entityKey,
+                                timeIdentifier = streamObj.timeIdentifier,
+                                timeFormat = streamObj.timeFormat,
+                                timeZone = streamObj.timeZone,
+                                signalIdentifier = streamObj.signalIdentifier,
+                                valueIdentifier = streamObj.valueIdentifier
+                            };
+                        }
+                    }
+                }
+                return newObj??streamObj;
+            }
+            catch(Exception e)
+            {
+                throw (e);
+            }
+        }
+    }
+
+    public class DataStreamSpec
+    {
+        public string name { get; set; }
+        public string timeZone { get; set; }
+        public bool isBatch { get; set; }
+        public string baseTimeUnit { get; set; }
     }
 
     public class BatchFormat:StreamFormat
@@ -50,13 +201,13 @@ namespace falkonry.com.api
         public string batchIdentifier { get; set; }
     }
 
-    public class NarrowStreamFormat:StreamFormat
+    public class NarrowFormat:StreamFormat
     {
         public string valueIdentifier { get; set; }
         public string signalIdentifier { get; set; }
     }
 
-    public class NarrowBatchStreamFormat:NarrowStreamFormat
+    public class NarrowBatchFormat:NarrowFormat
     {
         public string batchIdentifier { get; set; }
     }
@@ -78,21 +229,27 @@ namespace falkonry.com.api
         public IngestSpec<T> spec { get; set; }
     }
 
+
+
     public class ApiHelper : IApiHelper
     {
+        static int MAXPROPS = 100;
+        static int MINSLEEPSEC = 0;
         static int MINFILEBLOCK = 2;
-        static int MAXSTREAMS = 20;
-        static int MAXASSESSMENTS = 10;
-        static int MAXMODELS = 30;
+        static int MAXSTREAMS = 100;
+        static int MAXASSESSMENTS = 50;
+        static int MAXMODELS = 100;
         static int MAXJOBS = 30;
         static int MAXUSERS = 20;
         string _account = "";
         string _endpointUri = "https://localhost:30063/api/1.1";
         string _token = "";
         string _baseUri = "";
+        Action<dynamic> _responseCallback; // Used to notify of multi-response calls
 
-        public ApiHelper(string account, string token, string endpointUri = "https://localhost:30063/api/1.1")
+        public ApiHelper(string account, string token, string endpointUri = "https://localhost:30063/api/1.1", Dictionary<string, string> accountProps = null, Action<dynamic> responseCallback = null)
         {
+            _responseCallback = responseCallback;
             if (string.IsNullOrEmpty(token))
                 throw (new ArgumentNullException(nameof(token)));
             this._token = token;
@@ -106,10 +263,20 @@ namespace falkonry.com.api
             else
                 throw (new ArgumentException($"Uri {endpointUri} is not valid"));
             _baseUri = _endpointUri.Substring(0, endpointUri.IndexOf("/api/"));
+
             // TODO: remove this later
             // Configure to ignore bad certificates for this endpoint
             FlurlHttp.ConfigureClient(_endpointUri, cli =>
-                cli.Settings.HttpClientFactory = new UntrustedCertClientFactory());
+                {
+                    cli.Settings.HttpClientFactory = new UntrustedCertClientFactory();
+                    cli.Settings.Timeout = new TimeSpan(0, 30, 0);  // 30 minutes timeout
+                });
+
+            // Configure account properties if any
+            if (accountProps != null && accountProps.Count>0)
+            {
+                var response = SetAccountProps(account,accountProps);
+            }
         }
 
         private bool IsValidUri(string uri)
@@ -126,6 +293,77 @@ namespace falkonry.com.api
         }
 
         #region IApiHelper interface
+        public IList<dynamic> GetAccountProps(string account)
+        {
+            // Get list of props            
+            var props = _endpointUri
+            .AppendPathSegments("accounts", _account, "properties")
+            .SetQueryParams(new { limit = MAXPROPS })
+            .WithOAuthBearerToken(_token)
+            .GetJsonAsync().Result;
+            return props.properties;
+        }
+
+        public IList<dynamic> SetAccountProps(string account, Dictionary<string, string> props)
+        {
+            // Get existing properties
+            var existProps = GetAccountProps(account);
+            List<dynamic> responses = new List<dynamic>();
+            foreach (var kv in props)
+            {
+                var exist = existProps.Where(p => p.key == kv.Key).FirstOrDefault();
+                var prop = new
+                {
+                    key = kv.Key,
+                    value = kv.Value
+                };
+
+                try
+                {
+                    // Create
+                    dynamic propResponse = null;
+                    if (exist == null)
+                    {
+                        propResponse = _endpointUri
+                        .AppendPathSegments("accounts", _account, "properties")
+                        .WithOAuthBearerToken(_token)
+                        .PostJsonAsync(prop)
+                        .ReceiveJson().Result;
+                    }
+                    else
+                    {
+                        propResponse = _endpointUri
+                        .AppendPathSegments("accounts", _account, "properties", (string)exist.id)
+                        .WithOAuthBearerToken(_token)
+                        .PutJsonAsync(prop)
+                        .ReceiveJson().Result;
+                    }
+                    _responseCallback.Invoke(propResponse);
+                    responses.Add(propResponse);
+                }
+                catch (Exception e)
+                {
+                    // TODO logging
+                    // Unwrapping
+                    if (e is System.AggregateException)
+                    {
+                        foreach (var ie in ((System.AggregateException)e).InnerExceptions)
+                        {
+                            if (ie is FlurlHttpException)
+                            {
+                                string msg = ((FlurlHttpException)ie).GetResponseStringAsync().Result;
+                                ie.HelpLink = msg;
+                            }
+                        }
+                    }
+                    e.HelpLink = $"failure to set account property {JsonConvert.SerializeObject(prop)}";
+                    throw (e);
+                }
+            }
+            return responses;
+
+        }
+
         public IList<dynamic> GetDataStreams()
         {
             // Get list of data streams            
@@ -212,18 +450,24 @@ namespace falkonry.com.api
                         }
                     }
                 }
-
-                throw (e);
+               throw (e);
             }
-
             return jobResponse;
         }
 
-        public IList<dynamic> LoadCSVFiles<T>(IList<string> filepaths, Job<T> jobObj, int blocksize = 10) where T : StreamFormat
+        public IList<dynamic> LoadCSVFiles<T>(IList<string> filepaths, Job<T> jobObj, int blocksize=0,int sleepSecs=0) where T : StreamFormat
         {
-            if (blocksize < MINFILEBLOCK)
+            if(blocksize==0)
+            {
+                blocksize = filepaths.Count;
+            }
+            else if (blocksize < MINFILEBLOCK)
             {
                 blocksize = MINFILEBLOCK;
+            }
+            if(sleepSecs<MINSLEEPSEC)
+            {
+                sleepSecs = MINSLEEPSEC;
             }
 
             IList<dynamic> jobResponses = new List<dynamic>();
@@ -240,14 +484,17 @@ namespace falkonry.com.api
                         .WithOAuthBearerToken(_token)
                         .PostJsonAsync(jobObj)
                         .ReceiveJson().Result;
-                        // var jsonResponse = JsonConvert.SerializeObject(jobResponse);jo
+                        // var jsonResponse = JsonConvert.SerializeObject(jobResponse);
+                        var clone = Clone(jobResponse);
+                        // Callback
+                        _responseCallback?.Invoke(clone);
                         // Add to responses
-                        jobResponses.Add(Clone(jobResponse));
+                        jobResponses.Add(clone);
                     }
                     catch (Exception e)
                     {
                         // TODO logging
-                        // Unwrapping
+                        // Unwrappingnes
                         if (e is System.AggregateException)
                         {
                             foreach (var ie in ((System.AggregateException)e).InnerExceptions)
@@ -260,11 +507,16 @@ namespace falkonry.com.api
                             }
                         }
                         e.HelpLink = $"failure to create job starting with file {filepaths[i]} with blocksize {blocksize}";
-                        throw (e);
+                        var excResponse = CreateExceptionResponse(e, "creating job");
+                        // Call callback
+                        _responseCallback?.Invoke(excResponse);
+                        jobResponses.Add(excResponse);;
+                        break;
                     }
                 }
 
                 // Send file
+                var start = DateTime.Now;
                 try
                 {
                     var fileContent = new StringContent(File.ReadAllText(filepaths[i]));
@@ -275,8 +527,15 @@ namespace falkonry.com.api
                     .PostAsync(fileContent)
                     .ReceiveJson().Result;
 
+                    // TODO: Move to callbacks
+                    Console.WriteLine($"It took {TimeSpan.FromTicks(DateTime.Now.Ticks - start.Ticks)} to send file {filepaths[i]}");
+                    
+                    // Call callback
+                    _responseCallback?.Invoke(fileResponse);
+
                     // Add to responses
                     jobResponses.Add(fileResponse);
+
                 }
                 catch (Exception e)
                 {
@@ -293,8 +552,13 @@ namespace falkonry.com.api
                             }
                         }
                     }
-                    e.HelpLink = $"failure to send file {filepaths[i]}";
-                    throw (e);
+                    e.HelpLink = $"failure to send file {filepaths[i]} after {TimeSpan.FromTicks(DateTime.Now.Ticks-start.Ticks)}";
+                    var excResponse = CreateExceptionResponse(e, "sending file");
+
+                    // Call callback for exception thrown
+                    _responseCallback?.Invoke(excResponse);
+                    
+                    jobResponses.Add(excResponse);
                 }
 
                 if (i % blocksize == (blocksize - 1) || i == (filepaths.Count - 1))
@@ -303,7 +567,6 @@ namespace falkonry.com.api
                     {
                         // Complete files ingest job
                         var complJobObj = new Job<T>();
-
                         complJobObj.jobType = JOBTYPE.INGESTDATA;
                         complJobObj.status = JOBSTATUS.COMPLETED;
                         complJobObj.datastream = jobObj.datastream;
@@ -314,8 +577,12 @@ namespace falkonry.com.api
                         .PutJsonAsync(complJobObj)
                         .ReceiveJson().Result;
 
+                        // Call callback
+                        _responseCallback?.Invoke(jobResponse);
+
                         // Add to responses
                         jobResponses.Add(Clone(jobResponse));
+
                     }
                     catch (Exception e)
                     {
@@ -333,23 +600,102 @@ namespace falkonry.com.api
                             }
                         }
                         e.HelpLink = $"failure to close the job {(string)jobResponse.id} starting with file {filepaths[i - (blocksize - 1)]} with blocksize {blocksize}";
-                        throw (e);
+                        var excResponse = CreateExceptionResponse(e, "closing job");
+
+                        // Call callback
+                        _responseCallback?.Invoke(excResponse);
+
+                        // Add to responses
+                        jobResponses.Add(excResponse);
+
+                        break;
                     }
+
+                    if (sleepSecs>0)
+                        Thread.Sleep(sleepSecs * 1000);
+
                 }
             }
-
             return jobResponses;
         }
 
-        public IList<dynamic> GetJobs()
+        public dynamic SetDataStream(string name, string timezone, MODELTYPE modelType, string baseTimeUnit = "micros")
         {
-            // Get list ofjobs            
-            var jobs = _endpointUri
-            .AppendPathSegments("accounts", _account, "jobs")
-            .SetQueryParams(new { limit = MAXJOBS })
-            .WithOAuthBearerToken(_token)
-            .GetJsonListAsync().Result;
+            // Check if already exists
+            var existStreams = GetDataStreams();
+            var exist = existStreams.Where(p => p.name == name);
+            if (exist.Any())
+            {
+                if (exist.Count() > 1)
+                {
+                    throw (new ArgumentException($"More than one stream match the name ${name}"));
+                }
+                return exist.First();
+                /*  TODO: Why does this throw runtime binding exception
+                    exist.First().id,
+                    message = "Stream already exists"
+                };
+                */
+            }
 
+            DataStreamSpec spec = new DataStreamSpec()
+            {
+                name = name,
+                timeZone = timezone,
+                isBatch = modelType == MODELTYPE.BATCH,
+                baseTimeUnit = baseTimeUnit
+            };
+
+            try
+            {
+                var streamResponse = _endpointUri
+                .AppendPathSegments("accounts", _account, "datastreams")
+                .WithOAuthBearerToken(_token)
+                .PostJsonAsync(spec)
+                .ReceiveJson().Result;
+                return streamResponse;
+            }
+            catch (Exception e)
+            {
+                // TODO logging
+                // Unwrapping
+                if (e is System.AggregateException)
+                {
+                    foreach (var ie in ((System.AggregateException)e).InnerExceptions)
+                    {
+                        if (ie is FlurlHttpException)
+                        {
+                            string msg = ((FlurlHttpException)ie).GetResponseStringAsync().Result;
+                            ie.HelpLink = msg;
+                        }
+                    }
+                }
+                e.HelpLink = $"failure to create datastream";
+                throw (e);
+            }
+        }
+
+        public IList<dynamic> GetJobs(string stream=null,IList<JOBTYPE> types=null,IList<JOBSTATUS> statuses=null)
+        {
+            // Get list ofjobs           
+            IList<dynamic> jobs = new List<dynamic>();
+            var request = _endpointUri
+                .AppendPathSegments("accounts", _account, "jobs")
+                .WithOAuthBearerToken(_token)
+                .SetQueryParam("limit", MAXJOBS);
+            if(!String.IsNullOrEmpty(stream))
+                request = request.SetQueryParam("datastream", new[] { stream });
+            if(types!=null && types.Count > 0)
+            {
+                var t = (from type in types select type.ToString()).ToArray();
+                request = request.SetQueryParam("type",t);
+            }
+            if(statuses!=null && statuses.Count>0)
+            {
+                var s = (from status in statuses select status.ToString()).ToArray();
+                request = request.SetQueryParam("status",s);
+            }
+            jobs =request.GetJsonListAsync().Result;
             return jobs;
         }
 
@@ -366,6 +712,139 @@ namespace falkonry.com.api
             return users;
         }
 
+        public dynamic CancelJob(string jobId)
+        {
+            dynamic response = null;
+            try
+            {
+                // Get job to see if it exists else return exception
+                var exists = _endpointUri
+                .AppendPathSegments("accounts", _account, "jobs",jobId)
+                .SetQueryParams(new { limit = MAXPROPS })
+                .WithOAuthBearerToken(_token)
+                .GetJsonAsync().Result;
+
+                // If stream does not exists, must delete  instead of cancel
+                var streamExists= from stream in GetDataStreams() where stream.id == exists.datastream select stream;
+                if (!streamExists.Any())
+                {
+                    response = _endpointUri
+                    .AppendPathSegments("accounts", _account, "jobs", jobId)
+                    .WithOAuthBearerToken(_token)
+                    .DeleteAsync()
+                    .ReceiveJson().Result;
+                }
+                else
+                {
+                    // Cancel job
+                    /*
+                    var jsonText = JsonConvert.SerializeObject(exists, Formatting.Indented,
+                                       new JsonSerializerSettings
+                                       {
+                                           ReferenceLoopHandling = ReferenceLoopHandling.Ignore
+                                           //ReferenceLoopHandling=ReferenceLoopHandling.Serialize,
+                                           //PreserveReferencesHandling=PreserveReferencesHandling.Objects
+                                       });
+                    */
+                    var cancelJobObj = new Job<StreamFormat>();
+                    cancelJobObj.jobType = (JOBTYPE)Enum.Parse(typeof(JOBTYPE), exists.jobType);
+                    cancelJobObj.status = JOBSTATUS.CANCELLED;
+                    cancelJobObj.datastream = exists.datastream;
+                    // Cannot leave spec undefined so fake it
+                    bool hasEntityId = ((IDictionary<string, object>)exists.spec.format).ContainsKey("entityIdentifier");
+                    cancelJobObj.spec = new IngestSpec<StreamFormat>()
+                    {
+                        format = new StreamFormat()
+                        {
+                            entityIdentifier = hasEntityId?exists.spec.format.entityIdentifier:"",
+                            entityKey=!hasEntityId?exists.spec.format.entityKey:"",
+                            timeIdentifier = exists.spec.format.timeIdentifier,
+                            timeFormat = exists.spec.format.timeFormat,
+                        }   
+                    };
+                    var jobInJson = JsonConvert.SerializeObject(cancelJobObj); // For debugging 
+                    response = _endpointUri
+                    .AppendPathSegments("accounts", _account, "jobs", jobId)
+                    .WithOAuthBearerToken(_token)
+                    .PutJsonAsync(cancelJobObj)
+                    .ReceiveJson().Result;
+                }
+            }
+            catch (Exception e)
+            {
+                // Unwrappingnes
+                if (e is System.AggregateException)
+                {
+                    foreach (var ie in ((System.AggregateException)e).InnerExceptions)
+                    {
+                        if (ie is FlurlHttpException)
+                        {
+                            string msg = ((FlurlHttpException)ie).GetResponseStringAsync().Result;
+                            ie.HelpLink = msg;
+                        }
+                    }
+                }
+                e.HelpLink = $"failure to cancel job with id {jobId}";
+                var excResponse = CreateExceptionResponse(e, "cancelling job");
+                // Call callback
+                _responseCallback?.Invoke(excResponse);
+                throw (e);
+            }
+            return response;
+        }
+
+        public IList<dynamic> CancelStreamJobs(string stream, List<JOBTYPE> typeFilters, List<JOBSTATUS> statusFilters)
+        {
+            IList<dynamic> existJobs = new List<dynamic>();
+            IList<dynamic> cancelResponses = new List<dynamic>();
+            // Read jobs
+            try 
+            {
+                // Get jobs
+                existJobs = GetJobs(stream,typeFilters,statusFilters);
+            }
+            catch(Exception e)
+            {
+                // Unwrappingnes
+                if (e is System.AggregateException)
+                { 
+                    foreach (var ie in ((System.AggregateException)e).InnerExceptions)
+                    {
+                        if (ie is FlurlHttpException)
+                        {
+                            string msg = ((FlurlHttpException)ie).GetResponseStringAsync().Result;
+                            ie.HelpLink = msg;
+                        }
+                    }
+                }
+                e.HelpLink = $"failure to query jobs for account {_account}";
+                var excResponse = CreateExceptionResponse(e, "querying jobs");
+                // Call callback
+                _responseCallback?.Invoke(excResponse);
+                throw (e);
+            }
+
+            // Cancel them
+            foreach(var job in existJobs)
+            {
+                try
+                {
+                    var response=CancelJob(job.id);
+                    cancelResponses.Add(response);
+                }
+                catch(Exception e)
+                {
+                    // No need to aggregate CancelJob did that already
+                    var excResponse = CreateExceptionResponse(e, "cancelling jobs");
+                    // Call callback
+                    _responseCallback?.Invoke(excResponse);
+                    // Add to returned list
+                    cancelResponses.Add(excResponse);
+                }
+            }
+
+            return cancelResponses;
+        }
 
         #endregion
 
@@ -383,6 +862,35 @@ namespace falkonry.com.api
             }
             else
                 throw (new ArgumentException("Only ExpandoObject types supported"));
+        }
+
+
+        private dynamic CreateExceptionResponse(Exception e,string type)
+        {
+            var exceptObj = new
+            {
+                exception = e.Message,
+                type,
+                message = e.HelpLink,
+                stack=e.StackTrace,
+                inner= new List<dynamic>()
+            };
+
+            if (e is System.AggregateException)
+            {
+                foreach (var ie in ((System.AggregateException)e).InnerExceptions)
+                {
+                    var innerObj = new
+                    {
+                        exception = ie.Message,
+                        message = ie.HelpLink,
+                        stack = ie.StackTrace
+                    };
+                    exceptObj.inner.Add(innerObj);
+                }
+            }
+
+            return exceptObj;
         }
     }
 }

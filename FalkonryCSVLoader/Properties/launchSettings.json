@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FalkonryCSVLoader": {
+      "commandName": "Project",
+      "commandLineArgs": "-c narrow.json -r \"C:\\Users\\m2bre\\Documents\\Projects\\Aptar\\Data\\Colmec\\COLMEC_Data_Oct\\Output\\bi-vis 2\" -u https://app3.falkonry.ai/api/1.1 -a 596325951103639552 -t eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE4Nzc5OTMxMTAsICJlbWFpbCIgOiAibWFyaW8uYnJlbmVzQGZhbGtvbnJ5LmNvbSIsICJuYW1lIiA6ICJtYXJpby5icmVuZXNAZmFsa29ucnkuY29tIiwgInNlc3Npb24iIDogIjU5Nzk1MTM0NTQyMzY1MDgxNiIgfQ.MZXzxIfKWqnNCPSiXS9ECLjlyYTxJQ2-3Wf0OK60lZ0 -i API_TEST1"
+    }
+  }
+}
