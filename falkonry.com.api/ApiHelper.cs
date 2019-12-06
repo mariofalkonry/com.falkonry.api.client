@@ -20,6 +20,7 @@ using System.IO;
 using System.Dynamic;
 using System.Threading;
 using System.Linq;
+using falkonry.com.util;
 // TODO: Logging
 
 namespace falkonry.com.api
@@ -43,9 +44,9 @@ namespace falkonry.com.api
 
     public interface IApiHelper
     {
-        dynamic LoadCSVFile<T>(string filepath,Job<T> job) where T:StreamFormat;
+        IList<dynamic> LoadCSVFile<T>(string filepath,Job<T> job,uint chunkMB=0) where T:StreamFormat;
 
-        IList<dynamic> LoadCSVFiles<T>(IList<string> filepaths, Job<T> job,int blocksize=20,int sleepSecs=20) where T : StreamFormat;
+        IList<dynamic> LoadCSVFiles<T>(IList<string> filepaths, Job<T> job,int blocksize=20,int sleepSecs=20, uint chunkMB=0) where T : StreamFormat;
 
         IList<dynamic> GetDataStreams();
         IList<dynamic> GetJobs(string stream = null, IList<JOBTYPE> types = null, IList<JOBSTATUS> statuses = null);
@@ -262,7 +263,10 @@ namespace falkonry.com.api
                 _endpointUri = endpointUri;
             else
                 throw (new ArgumentException($"Uri {endpointUri} is not valid"));
-            _baseUri = _endpointUri.Substring(0, endpointUri.IndexOf("/api/"));
+            var idx = endpointUri.IndexOf("/api/");
+            if (idx<0)
+                throw (new ArgumentException($"Uri {endpointUri} is not valid"));
+            _baseUri = _endpointUri.Substring(0, idx);
 
             // TODO: remove this later
             // Configure to ignore bad certificates for this endpoint
@@ -398,29 +402,52 @@ namespace falkonry.com.api
         }
 
         //curl -X POST --header 'Content-type: text/csv' --header 'Authorization: Bearer [token]' --data-binary "@/Users/User1/Desktop/HumanActivity/source1.csv" 'http://<serveraddress>:30063/api/1.1/accounts/1549746082718454/datastreams/1554938538981549/ingestdata/1554942688319300/inputs'
-        public dynamic LoadCSVFile<T>(string filepath, Job<T> jobObj) where T : StreamFormat
+        public IList<dynamic> LoadCSVFile<T>(string filepath, Job<T> jobObj,uint chunkMB=0) where T : StreamFormat
         {
             // Create Job
             //var jobInJson = JsonConvert.SerializeObject(jobObj);
-            dynamic jobResponse;
-            // Send data
-            //curl -X POST --header 'Content-type: text/csv' --header 'Authorization: Bearer [token]' --data-binary "@/Users/User1/Desktop/HumanActivity/source1.csv" 'http://<serveraddress>:30063/api/1.1/accounts/1549746082718454/datastreams/1554938538981549/ingestdata/1554942688319300/inputs
-            var fileContent = new StringContent(File.ReadAllText(filepath));
-            //            var fileContent = new ByteArrayContent(File.ReadAllBytes(filepath));
+            var jobResponses=new List<dynamic>();
             try
             {
-                jobResponse = _endpointUri
+                var jobResponse = _endpointUri
                 .AppendPathSegments("accounts", _account, "jobs")
                 .WithOAuthBearerToken(_token)
                 .PostJsonAsync(jobObj)
                 .ReceiveJson().Result;
+                jobResponses.Add(jobResponse);
                 // var jsonResponse = JsonConvert.SerializeObject(jobResponse);
 
-                var fileResponse = new Url(_baseUri + jobResponse.links[0].url)
-                .WithHeader("Content-type", "text/csv")
-                .WithOAuthBearerToken(_token)
-                .PostAsync(fileContent)
-                .ReceiveJson().Result;
+                // Loop sending chunks
+                // Send data
+                //curl -X POST --header 'Content-type: text/csv' --header 'Authorization: Bearer [token]' --data-binary "@/Users/User1/Desktop/HumanActivity/source1.csv" 'http://<serveraddress>:30063/api/1.1/accounts/1549746082718454/datastreams/1554938538981549/ingestdata/1554942688319300/inputs
+                using (var reader = File.OpenText(filepath))
+                {
+                    // If no chunking send entire content at once
+                    if (chunkMB <= 0)
+                    {
+                        var fileContent = new StringContent(File.ReadAllText(filepath));
+                        var fileResponse = new Url(_baseUri + jobResponse.links[0].url)
+                        .WithHeader("Content-type", "text/csv")
+                        .WithOAuthBearerToken(_token)
+                        .PostAsync(fileContent)
+                        .ReceiveJson().Result;
+                        jobResponses.Add(fileResponse);
+                    }
+                    else
+                    {
+                        Action<String> sendText = delegate (String text)
+                        {
+                            var chunkContent = new StringContent(text);
+                            var chunkResponse = new Url(_baseUri + jobResponse.links[0].url)
+                            .WithHeader("Content-type", "text/csv")
+                            .WithOAuthBearerToken(_token)
+                            .PostAsync(chunkContent)
+                            .ReceiveJson().Result;
+                            jobResponses.Add(chunkResponse);
+                        };
+                        Chunker.ChunkTextFromText(Chunker.GetChunkSize(chunkMB), reader, sendText);
+                    }
+                }
 
                 // Complete file ingest job
                 var complJobObj = new Job<T>();
@@ -434,6 +461,7 @@ namespace falkonry.com.api
                 .WithOAuthBearerToken(_token)
                 .PutJsonAsync(complJobObj)
                 .ReceiveJson().Result;
+                jobResponses.Add(jobResponse);
             }
             catch (Exception e)
             {
@@ -452,10 +480,10 @@ namespace falkonry.com.api
                 }
                throw (e);
             }
-            return jobResponse;
+            return jobResponses;
         }
 
-        public IList<dynamic> LoadCSVFiles<T>(IList<string> filepaths, Job<T> jobObj, int blocksize=0,int sleepSecs=0) where T : StreamFormat
+        public IList<dynamic> LoadCSVFiles<T>(IList<string> filepaths, Job<T> jobObj, int blocksize=0,int sleepSecs=0,uint chunkMB=0) where T : StreamFormat
         {
             if(blocksize==0)
             {
@@ -470,7 +498,7 @@ namespace falkonry.com.api
                 sleepSecs = MINSLEEPSEC;
             }
 
-            IList<dynamic> jobResponses = new List<dynamic>();
+            List<dynamic> jobResponses = new List<dynamic>();
             dynamic jobResponse=null;
             for (int i = 0; i < filepaths.Count; i++)
             {
@@ -519,22 +547,51 @@ namespace falkonry.com.api
                 var start = DateTime.Now;
                 try
                 {
-                    var fileContent = new StringContent(File.ReadAllText(filepaths[i]));
-                    //            var fileContent = new ByteArrayContent(File.ReadAllBytes(filepath));
-                    var fileResponse = new Url(_baseUri + jobResponse.links[0].url)
-                    .WithHeader("Content-type", "text/csv")
-                    .WithOAuthBearerToken(_token)
-                    .PostAsync(fileContent)
-                    .ReceiveJson().Result;
+                    var info = new FileInfo(filepaths[i]);
+                    var size = info.Length;
+                    Console.WriteLine($"Sending file {filepaths[i]} of {info.Length} bytes" + (chunkMB>0?$", in chunks of {chunkMB} MB":""));
+                    var fileResponses = new List<dynamic>();
+                    // Loop sending chunks
+                    // Send data
+                    //curl -X POST --header 'Content-type: text/csv' --header 'Authorization: Bearer [token]' --data-binary "@/Users/User1/Desktop/HumanActivity/source1.csv" 'http://<serveraddress>:30063/api/1.1/accounts/1549746082718454/datastreams/1554938538981549/ingestdata/1554942688319300/inputs
+                    using (var reader = File.OpenText(filepaths[i]))
+                    {
+                        // If no chunking send entire content at once
+                        if (chunkMB <= 0)
+                        {
+                            var fileContent = new StringContent(File.ReadAllText(filepaths[i]));
+                            var fileResponse = new Url(_baseUri + jobResponse.links[0].url)
+                            .WithHeader("Content-type", "text/csv")
+                            .WithOAuthBearerToken(_token)
+                            .PostAsync(fileContent)
+                            .ReceiveJson().Result;
+                            fileResponses.Add(fileResponse);
+                            // Call callback
+                            _responseCallback?.Invoke(fileResponse);
+                        }
+                        else
+                        {
+                            Action<String> sendText = delegate (String text)
+                            {
+                                var chunkContent = new StringContent(text);
+                                var chunkResponse = new Url(_baseUri + jobResponse.links[0].url)
+                                .WithHeader("Content-type", "text/csv")
+                                .WithOAuthBearerToken(_token)
+                                .PostAsync(chunkContent)
+                                .ReceiveJson().Result;
+                                fileResponses.Add(chunkResponse);
+                                // Call callback
+                                _responseCallback?.Invoke(chunkResponse);
+                            };
+                            Chunker.ChunkTextFromText(Chunker.GetChunkSize(chunkMB), reader, sendText);
+                        }
+                    }
 
                     // TODO: Move to callbacks
                     Console.WriteLine($"It took {TimeSpan.FromTicks(DateTime.Now.Ticks - start.Ticks)} to send file {filepaths[i]}");
-                    
-                    // Call callback
-                    _responseCallback?.Invoke(fileResponse);
 
                     // Add to responses
-                    jobResponses.Add(fileResponse);
+                    jobResponses.AddRange(fileResponses);
 
                 }
                 catch (Exception e)

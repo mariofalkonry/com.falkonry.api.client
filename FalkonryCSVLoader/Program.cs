@@ -16,6 +16,7 @@ using Serilog;
 using CommandLine;
 using CommandLine.Text;
 using Serilog.Events;
+using falkonry.com.util;
 
 namespace falkonry.com.api
 {
@@ -34,7 +35,7 @@ namespace falkonry.com.api
         // App3 Falkonry Internal
         // App3 Aptar Injectables
         //static string account = "637101632562577408";
-        //static string token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE4ODc3MjYyNzYsICJlbWFpbCIgOiAibWFyaW8uYnJlbmVzQGZhbGtvbnJ5LmNvbSIsICJuYW1lIiA6ICJtYXJpby5icmVuZXNAZmFsa29ucnkuY29tIiwgInNlc3Npb24iIDogIjYzODc3NTIwNTA2Njg3ODk3NiIgfQ.x9fGscxaacWavrD5KvzrotzaQ0RE2QRA8jBZo_XLwEU";
+        //static string token = "-u https://app3.falkonry.ai/api/1.1 -c wide.json -a 637101632562577408 -i 637119870126178304 -r "C:\Users\m2bre\Documents\Projects\Aptar\Data\Colmec\COLMEC_Data_LateOct\Output\Bi-vis 1" -t eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE4ODkyMDM4MjgsICJlbWFpbCIgOiAibWFyaW8uYnJlbmVzQGZhbGtvbnJ5LmNvbSIsICJuYW1lIiA6ICJtYXJpby5icmVuZXNAZmFsa29ucnkuY29tIiwgInNlc3Npb24iIDogIjY0NDk3MjUwNTkyNzkwOTM3NiIgfQ.6OKUtA2WDACWnLs6vgA01PZOODZi8a5dpSL2AmMWLcQ";
         // Teekay LRS 2.0
         //static string account = "Lsosgyy0b8cynn";
         //static string token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE4NzA5ODE4OTAsICJlbWFpbCIgOiAibWFyaW8uYnJlbmVzQGZhbGtvbnJ5LmNvbSIsICJuYW1lIiA6ICJtYXJpby5icmVuZXNAZmFsa29ucnkuY29tIiwgInNlc3Npb24iIDogIjE1NTU4OTUzMDY0NjY4NDUiIH0.s_cBIkUQbybLvMix9xCVC6lfkSeYrxMdFlFGmNI8MNQ";
@@ -55,6 +56,7 @@ namespace falkonry.com.api
 
         static uint? DEFAULTBATCH = 100;
         static uint? DEFAULTSLEEP = 10;
+        static uint? DEFAULCHUNK = 64;
 
         // Command Line Options
         class Options
@@ -107,6 +109,9 @@ namespace falkonry.com.api
             [Option('i', "sid", Required = false, HelpText = "Datastream id. Specify id of an existing datastream id obtained from Url of Falkorny LRS UI.  If this parameter is specified, the loader will not create a new stream and hence ignore parameter 'n'.")]
             public string StreamId{ get; set; }
 
+            [Option('k', "chunk", Required = false, HelpText = "Chunk size in MB.  This parameter allows breaking large files into chunks to be sent to Falkonry. Options={8, 16, 24, 36, 48, 64, 128}.  Default=64")]
+            public uint? ChunkMB { get; set; }
+
         }
          
         static void printExceptionInformation(Exception e)
@@ -146,6 +151,7 @@ namespace falkonry.com.api
             uint? batchSize = DEFAULTBATCH;
             uint? sleep = DEFAULTSLEEP;
             string fileFilter = "*.csv";
+            uint? chunkMB = DEFAULCHUNK;
             Parser.Default.ParseArguments<Options>(args).WithParsed<Options>(o =>
             {
                 rootPath = o.RootPath;
@@ -158,6 +164,8 @@ namespace falkonry.com.api
                 fileFilter = o.FilesFilter ?? fileFilter;
                 sleep = o.Sleep ?? sleep;
                 batchSize = o.Batch ?? batchSize;
+                chunkMB = o.ChunkMB ?? chunkMB;
+
             }).WithNotParsed<Options>((errs) => Environment.Exit(-1));
 
             // Clamp sleep and batch
@@ -233,7 +241,7 @@ namespace falkonry.com.api
 
                 try
                 {
-                    var loadResponse = apiHelper.LoadCSVFiles(files.ToList<string>(), job, (int)batchSize, (int)sleep);
+                    var loadResponse = apiHelper.LoadCSVFiles(files.ToList<string>(), job, (int)batchSize, (int)sleep, chunkMB.Value);
                     jsonText=JsonConvert.SerializeObject(loadResponse, Formatting.Indented,
                         new JsonSerializerSettings
                         {

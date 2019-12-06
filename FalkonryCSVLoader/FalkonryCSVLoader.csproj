@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.2</TargetFramework>
-    <Version>0.5.0</Version>
+    <Version>1.0.1</Version>
     <Company>Falkonry, Inc.</Company>
     <Authors>Customer Success Department</Authors>
     <Copyright>Falkonry, Inc</Copyright>
@@ -25,6 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Chunker\Chunker.csproj" />
     <ProjectReference Include="..\falkonry.com.api\falkonry.com.api.csproj" />
   </ItemGroup>
 

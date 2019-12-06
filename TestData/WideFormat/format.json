@@ -1,7 +1,6 @@
 {
-  "Formatter": {
-    "entityIdentifier": "entity",
-
-
-  }
+	"entityIdentifier" : "entity",
+	"timeIdentifier" :"timestamp",
+	"timeFormat" :"YYYY-MM-DD HH:mm:ss",
+	"timeZone" : "Europe/London"
 }

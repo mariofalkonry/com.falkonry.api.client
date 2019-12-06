@@ -17,7 +17,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FileCopy", "FileCopy\FileCo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataSanitizer", "DataSanitizer\DataSanitizer.csproj", "{B7E7204D-16F4-46CD-B3F5-08B6F06A0691}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FalkonryCancelJobs", "FalkonryCancelJobs\FalkonryCancelJobs.csproj", "{AE5C03D5-28BF-4FD7-8F2E-965D5A75813D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FalkonryCancelJobs", "FalkonryCancelJobs\FalkonryCancelJobs.csproj", "{AE5C03D5-28BF-4FD7-8F2E-965D5A75813D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chunker", "Chunker\Chunker.csproj", "{EF46D5C8-A5E3-409E-8737-701DA51E5DFC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -57,6 +59,10 @@ Global
 		{AE5C03D5-28BF-4FD7-8F2E-965D5A75813D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AE5C03D5-28BF-4FD7-8F2E-965D5A75813D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AE5C03D5-28BF-4FD7-8F2E-965D5A75813D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EF46D5C8-A5E3-409E-8737-701DA51E5DFC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF46D5C8-A5E3-409E-8737-701DA51E5DFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF46D5C8-A5E3-409E-8737-701DA51E5DFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EF46D5C8-A5E3-409E-8737-701DA51E5DFC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
