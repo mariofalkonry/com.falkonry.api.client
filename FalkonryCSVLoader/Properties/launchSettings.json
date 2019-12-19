@@ -2,7 +2,11 @@
   "profiles": {
     "FalkonryCSVLoader": {
       "commandName": "Project",
-      "commandLineArgs": "-u https://app3.falkonry.ai/api/1.1 -a 596325951103639552 -t \"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE4Nzc5OTMxMTAsICJlbWFpbCIgOiAibWFyaW8uYnJlbmVzQGZhbGtvbnJ5LmNvbSIsICJuYW1lIiA6ICJtYXJpby5icmVuZXNAZmFsa29ucnkuY29tIiwgInNlc3Npb24iIDogIjU5Nzk1MTM0NTQyMzY1MDgxNiIgfQ.MZXzxIfKWqnNCPSiXS9ECLjlyYTxJQ2-3Wf0OK60lZ0\" -n \"F-MB API Test\" -r \"C:\\Users\\m2bre\\Documents\\Code\\csharp\\FlurSandbox\\TestData\\WideFormat\" -c \"C:\\Users\\m2bre\\Documents\\Code\\csharp\\FlurSandbox\\TestData\\WideFormat\\format.json\" -f \"*Medium*.csv\" -k 16"
+      "commandLineArgs": "-u https://app3.falkonry.ai/api/1.1 -a 596325951103639552 -t \"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE4Nzc5OTMxMTAsICJlbWFpbCIgOiAibWFyaW8uYnJlbmVzQGZhbGtvbnJ5LmNvbSIsICJuYW1lIiA6ICJtYXJpby5icmVuZXNAZmFsa29ucnkuY29tIiwgInNlc3Npb24iIDogIjU5Nzk1MTM0NTQyMzY1MDgxNiIgfQ.MZXzxIfKWqnNCPSiXS9ECLjlyYTxJQ2-3Wf0OK60lZ0\" -n \"F-MB API Test\" -r \"C:\\Users\\m2bre\\Documents\\Projects\\KolonBenit\" -c \"C:\\Users\\m2bre\\Documents\\Projects\\KolonBenit\\wide_kb.json\" -f \"*-cleaned.csv\" -k 16"
+    },
+    "MediumLoadTest": {
+      "commandName": "Project",
+      "commandLineArgs": "-u https://app3.falkonry.ai/api/1.1 -a 596325951103639552 -t \"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE4Nzc5OTMxMTAsICJlbWFpbCIgOiAibWFyaW8uYnJlbmVzQGZhbGtvbnJ5LmNvbSIsICJuYW1lIiA6ICJtYXJpby5icmVuZXNAZmFsa29ucnkuY29tIiwgInNlc3Npb24iIDogIjU5Nzk1MTM0NTQyMzY1MDgxNiIgfQ.MZXzxIfKWqnNCPSiXS9ECLjlyYTxJQ2-3Wf0OK60lZ0\" -n \"F-MB API Test\" -r \"C:\\Users\\m2bre\\Documents\\Code\\csharp\\FlurSandbox\\TestData\\WideFormat\" -c \"C:\\Users\\m2bre\\Documents\\Code\\csharp\\FlurSandbox\\TestData\\WideFormat\\format.json\" -f \"*Medium*.csv\" -k 48"
     }
   }
 }

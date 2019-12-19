@@ -240,7 +240,7 @@ namespace falkonry.com.api.test
             {
                 jobType = JOBTYPE.INGESTDATA,
                 status = JOBSTATUS.CREATED,
-                datastream = dataStream,
+                datastream = dataStream.id,
                 spec = spec
             };
 

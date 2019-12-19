@@ -500,6 +500,7 @@ namespace falkonry.com.api
 
             List<dynamic> jobResponses = new List<dynamic>();
             dynamic jobResponse=null;
+            var jobid = "";
             for (int i = 0; i < filepaths.Count; i++)
             {
                 if (i % blocksize == 0)
@@ -513,6 +514,7 @@ namespace falkonry.com.api
                         .PostJsonAsync(jobObj)
                         .ReceiveJson().Result;
                         // var jsonResponse = JsonConvert.SerializeObject(jobResponse);
+                        jobid = jobResponse.id;
                         var clone = Clone(jobResponse);
                         // Callback
                         _responseCallback?.Invoke(clone);
@@ -588,9 +590,14 @@ namespace falkonry.com.api
                     }
 
                     // TODO: Move to callbacks
-                    Console.WriteLine($"It took {TimeSpan.FromTicks(DateTime.Now.Ticks - start.Ticks)} to send file {filepaths[i]}");
+                    dynamic stats = new ExpandoObject();
+                    stats.jobid = jobid;
+                    stats.file = filepaths[i];
+                    stats.time = TimeSpan.FromTicks(DateTime.Now.Ticks - start.Ticks);
+                    Console.WriteLine($"It took {stats.time} to send file {stats.file}");
 
                     // Add to responses
+                    jobResponses.Add(stats);
                     jobResponses.AddRange(fileResponses);
 
                 }
